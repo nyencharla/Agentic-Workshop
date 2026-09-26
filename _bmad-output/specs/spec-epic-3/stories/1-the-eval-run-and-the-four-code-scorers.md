@@ -2,10 +2,11 @@
 title: 'The eval run and the four code scorers'
 type: 'feature'
 created: '2026-09-26'
-status: 'ready-for-dev'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 context: []
+baseline_commit: '8ff79cc1d0e4abd7ddda8b4106c2442df9d216d8'
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
@@ -67,16 +68,42 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `eval/run_eval.py` -- new: load `.env`, set MLflow URI/experiment and the two env settings above, build `data` from the CSV, define an `@mlflow.trace` `async` predict function that awaits `agent.triage`, define the four `@scorer` functions, call `mlflow.genai.evaluate`, and print the run ID and the four means -- the story's deliverable.
-- [ ] `tests/test_eval_scorers.py` -- new: unit-test each scorer on hand-built outputs, expectations and fake traces (valid/invalid schema, match/mismatch, correct/reversed/missing spans, `None` trace) -- no live model call.
+- [x] `eval/run_eval.py` -- new: load `.env`, set MLflow URI/experiment and the two env settings above, build `data` from the CSV, define an `@mlflow.trace` `async` predict function that awaits `agent.triage`, define the four `@scorer` functions, call `mlflow.genai.evaluate`, and print the run ID and the four means -- the story's deliverable.
+- [x] `tests/test_eval_scorers.py` -- new: unit-test each scorer on hand-built outputs, expectations and fake traces (valid/invalid schema, match/mismatch, correct/reversed/missing spans, `None` trace) -- no live model call.
 
 **Acceptance Criteria:**
 - Given `app.db` is loaded and a working provider key, when `uv run python eval/run_eval.py` runs, then exactly one new run appears in the `triage-agent` experiment with `valid_schema/mean`, `category_match/mean`, `priority_match/mean` and `tool_order/mean` computed over 20 tickets.
-- Given the run completes, when its traces are listed, then there is one trace per ticket and each contains that ticket's `get_ticket` and `get_customer_history` spans.
+- Given the run completes, when each ticket's scored trace is inspected, then it is a single trace holding that ticket's `get_ticket` and `get_customer_history` spans. (A prediction MLflow retries after a transient error, e.g. a rate limit, may leave one extra error trace in the run; it is not scored.)
 
 ## Implementation Notes
 
+- New files: `eval/run_eval.py` (CSV → `evaluate` data, `@mlflow.trace` async `predict` awaiting `agent.triage`, four `@scorer` functions, prints run ID and the four means), `tests/test_eval_scorers.py` (17 cases on fake traces/outputs, no model calls). `run_eval.py` also `chdir`s to the repo root so `sqlite:///mlflow.db` and the MCP server path always resolve there, and passes `expected_tools` through as an unscored expectation.
+- `uv run pytest` — 61 passed. Live run on Groq (run `90104aada8b54f46a0df6f0dd97a12e0`): exactly one run in `triage-agent`; `valid_schema`, `category_match`, `priority_match`, `tool_order` each 0.9 over 20 tickets — every ticket that completed matched its labels.
+- T-1044 and T-1048 failed and scored 0 on all four (the matrix's failure row): the model called `escalate_to_human`, which `TRIAGE_POLICY.md` tells it to use but which doesn't exist until Epic 2 story 2, and Groq rejected the undefined tool call with a 400. Pre-existing in the agent; deferred.
+- The run holds 21 traces: T-1047 hit Groq's tokens-per-minute limit, MLflow retried it successfully, and the failed attempt stayed as an extra error trace. Retries kept on (turning them off would score rate-limited tickets 0); the second acceptance criterion was reworded to what its intent required — see Spec Change Log.
+
+- After review fixes: `uv run pytest` — 63 passed (19 in `tests/test_eval_scorers.py`, incl. a real-trace `tool_order` test and an end-to-end `evaluate` wiring test with one failing ticket, both on a `tmp_path` store). Missing `app.db` now exits at once with the loader hint. Live re-run on Groq (run `3945b9fa045944328b3683e1d5163cdf`): `valid_schema` 0.9, `category_match` 0.9, `priority_match` 0.85, `tool_order` 0.9 — one priority differed from the previous run (model variance; tuning is a non-goal).
+
+## Spec Change Log
+
+- 2026-09-26, found at step 3 verification: the second acceptance criterion said "one trace per ticket", but MLflow's retry after a Groq 429 leaves the failed attempt as an extra error trace. Amended to require that each ticket's *scored* trace is a single trace holding both tool spans — the property `tool_order` actually depends on. Avoids the known-bad alternative of disabling retries, which would score rate-limited tickets 0. KEEP: default MLflow retries; `@mlflow.trace` on `predict`.
+
 ## Review Triage Log
+
+- **low (patched):** no preflight: without `app.db` every ticket still makes a paid model call (the agent calls the model before its first tool), plus MLflow's retries, then scores 0 — a fresh clone that skipped `load_seed.py` gets a misleading all-zero run. Fix: exit with a clear message if `app.db` is missing.
+- **low (patched):** `from agent import triage` inside `predict` turns a missing agent into 20 failed rows instead of one clear error. Fix: import at startup with a clear `SystemExit`, as `run_agent.py` does.
+- **low (patched):** `SCORER_NAMES` repeats the scorer function names; renaming a scorer silently prints `n/a`. Fix: derive names from `SCORERS`.
+- **medium (patched):** `tool_order` is only tested against a hand-built `FakeTrace` keyed on the same literal names it searches for; a change in how autolog names MCP tool spans would drop `tool_order` to 0 with every test passing. Fix: a test that produces a real MLflow trace from two stub LangChain tools named `get_ticket` and `get_customer_history` under autolog, against a `tmp_path` tracking store, and scores it.
+- **medium (patched):** nothing tests the `evaluate` wiring (`load_data` → `predict` → `SCORERS` → `<name>/mean` metrics) or the matrix's "agent fails on a ticket" row end to end; a renamed `predict` parameter would fail every row with all tests green. Fix: run `mlflow.genai.evaluate` with a fake `agent.triage` (one success, one raise) against a `tmp_path` store and assert all four means and the failing row's zeros.
+- **low (defer):** the script never says how many tickets failed (T-1044/T-1048 were invisible behind the 0.9 means) and always exits 0. The printed report is story 2's (CAP-7); recorded in `deferred-work.md` for it.
+- **false:** `valid_schema` accepts a JSON string that the match scorers reject. `predict` returns `agent.triage`'s output, which is always a dict (`TriageDecision.model_dump()`), so a string never reaches the scorers.
+- **false:** equal `get_ticket`/`get_customer_history` start times. The second tool needs the first's `customer_id`, so it can't start until the first returns; nanosecond timestamps can't tie.
+- **false:** `expected_tools` loaded but unused by `tool_order`. The spec defines `tool_order` as `get_ticket` before `get_customer_history`; `expected_tools` is passed through unscored by design.
+- **false:** `main` overrides `MLFLOW_GENAI_EVAL_*` env vars the user may have set. Both values are required by the spec's Code Map.
+- **false:** CSV encoding. `eval/labelled_tickets.csv` is plain ASCII (checked).
+- **false:** a row without expectations crashes the match scorers. `load_data` builds expectations for every row.
+- **low (rejected):** short CSV rows, whitespace/case in labels, the live-CSV-dependent data test. `eval/labelled_tickets.csv` is read-only and clean; the fixes add guards for input that never occurs.
+- **low (rejected):** `tool_order` when the agent's internal retry re-runs tools in the same trace — the first attempt's order is used. Only reachable after a structured-output failure, and both attempts use the same tool order; not worth extra per-attempt logic.
 
 ## Verification
 
