@@ -17,8 +17,10 @@ Route = Literal["billing-team", "bug-team", "access-team", "performance-team", "
 # A sentence break: end punctuation, whitespace, then a new sentence starting
 # with a capital letter. Requiring the capital avoids flagging abbreviations
 # ("e.g. this...") or a lowercase continuation ("rule 3. it applies...") as
-# a second sentence.
+# a second sentence. Known abbreviations lose their period first, so
+# "Dr. Smith" is not read as a break either.
 _MULTIPLE_SENTENCES = re.compile(r"[.!?]\s+[A-Z]")
+_ABBREVIATIONS = re.compile(r"\b(?:Dr|Mr|Mrs|Ms|St|Mt|No|etc|e\.g|i\.e|U\.S)\.")
 
 
 class TriageDecision(BaseModel):
@@ -37,20 +39,20 @@ class TriageDecision(BaseModel):
         text = value.strip()
         if not text:
             raise ValueError("rationale must not be empty")
-        if _MULTIPLE_SENTENCES.search(text):
+        if _MULTIPLE_SENTENCES.search(_ABBREVIATIONS.sub(lambda m: m.group(0)[:-1], text)):
             raise ValueError("rationale must be a single sentence")
         return text
 
 
 class TriageValidationError(ValueError):
-    """A decision does not match the schema. The message names every offending field."""
+    """A decision does not match the schema. Schema failures name every offending field."""
 
 
 def validate_decision(payload: str | bytes | dict) -> TriageDecision:
     """Parse and validate a decision from a dict or JSON text.
 
-    Raises TriageValidationError, naming each offending field, if the payload
-    is not valid JSON, is not an object, or fails the schema.
+    Raises TriageValidationError if the payload is not valid JSON, is not an
+    object, or fails the schema; schema failures name each offending field.
     """
     if isinstance(payload, (str, bytes)):
         try:

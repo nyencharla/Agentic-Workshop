@@ -39,3 +39,18 @@ context: []
 - **deferred to `deferred-work.md`:** an untracked `.env.swp` at the repo root holds a raw copy of `.env` (including API keys) and is not covered by `.gitignore`. Confirmed present and confirmed `.gitignore` covers only `.env`. Predates this story, not caused by it — flagged directly to the user as well since it's a live secret-exposure risk, not just filed away.
 - **deferred to `deferred-work.md`:** `testAgent.py`, an untracked scratch script unrelated to this story, makes a live network call and uses non-sanctioned model config. Predates this story, not caused by it.
 
+
+### Review Findings
+
+Code review of `main...story/nyencharla-1.1` (2026-09-26): Blind Hunter, Edge Case Hunter, Verification Gap, Acceptance Auditor.
+
+- [x] [Review][Patch] Single-sentence check rejects valid sentences with an abbreviation before a capitalised word ("Escalate per Dr. Smith request.") — skip known abbreviations (Dr., Mr., Mrs., Ms., St., Mt., e.g., i.e., etc., U.S., No.) before matching; keep the capital-letter rule, so lowercase second sentences still pass (accepted tradeoff, decided 2026-09-26: a false rejection fails an agent run, a missed second sentence only lengthens a rationale) [triage/schema.py:21]
+- [x] [Review][Patch] `validate_decision` docstring says every error names the offending field, but the not-JSON and not-an-object errors name none [triage/schema.py:52]
+- [x] [Review][Patch] The regression test doesn't use the input the Triage Log says was fixed ("Escalate per rule 3. it is Enterprise."); it uses a comma variant that never hits the regex [tests/test_schema.py:67]
+- [x] [Review][Defer] `SPEC.md` still lists the pairing, extra-field and one-sentence questions as open, though this story settled all three [_bmad-output/specs/spec-epic-1/SPEC.md:45] — deferred: the fix edits a spec, which must go through `/bmad-spec`.
+
+**Rejected**
+- false — no tests for wrong-type values: `priority: 1`, `category: None`, `rationale: 123` and `route: []` are all rejected with the field named (checked by direct call); the gap is coverage only, not behaviour.
+- false — empty `triage/__init__.py`: consumers import `triage.schema` without trouble (Epic 2's `agent.py` does); no caller breaks.
+- false — `tests/conftest.py` path workaround: tests import `triage` correctly and pass; no bad outcome.
+- false — `.env.swp` not gitignored: the file no longer exists, and the item is already in `deferred-work.md`.

@@ -4,3 +4,7 @@
 - source_spec: `_bmad-output/specs/spec-epic-1/stories/1-triage-decision-schema.md`
   summary: `testAgent.py` is an unrelated scratch script at the repo root that makes a live Gemini network call on import and uses config surface AGENTS.md doesn't sanction (`google.genai` directly, `GEMINI_MODEL`, `gemini-2.5-flash`).
   evidence: File predates this story (present in git status before this branch started) and is untouched by it. Violates Epic 1's "no network calls" constraint and AGENTS.md's Models section if ever run or copied from. Fix is outside this story: remove it or move it to whichever story actually needs it.
+
+## Deferred from: code review of 1-triage-decision-schema.md (2026-09-26)
+
+- `SPEC.md` (Epic 1) still lists as Open Questions the category/route pairing, extra-field rejection and one-sentence enforcement, all of which story 1 settled in code and tests. Must be reconciled through `/bmad-spec`, not by hand.
