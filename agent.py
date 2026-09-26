@@ -21,10 +21,11 @@ _MCP_SERVER_PATH = _REPO_ROOT / "mcp" / "triage_server.py"
 
 _DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 _DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
+_DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 
 
 def build_model():
-    """Pick the chat model from env: `PROVIDER=groq` selects `ChatGroq`, else `ChatGoogleGenerativeAI`.
+    """Pick the chat model from env: `PROVIDER=groq` selects `ChatGroq`, `PROVIDER=openai` `ChatOpenAI`, else `ChatGoogleGenerativeAI`.
 
     Model name comes from `MODEL` (defaulting per provider); keys are read by
     each provider's client from its own standard env var.
@@ -37,8 +38,13 @@ def build_model():
 
         return ChatGroq(model=model_name or _DEFAULT_GROQ_MODEL)
 
+    if provider == "openai":
+        from langchain_openai import ChatOpenAI
+
+        return ChatOpenAI(model=model_name or _DEFAULT_OPENAI_MODEL)
+
     if provider:
-        raise ValueError(f"Unrecognized PROVIDER {provider!r}; expected 'groq' or unset.")
+        raise ValueError(f"Unrecognized PROVIDER {provider!r}; expected 'groq', 'openai' or unset.")
 
     from langchain_google_genai import ChatGoogleGenerativeAI
 

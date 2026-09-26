@@ -90,6 +90,29 @@ class TestProviderSelection:
         assert type(model).__name__ == "ChatGroq"
         assert model.model_name == "groq-custom"
 
+    def test_provider_openai_switches_to_chatopenai_with_default_model(self, monkeypatch):
+        monkeypatch.setenv("PROVIDER", "openai")
+        monkeypatch.delenv("MODEL", raising=False)
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+        model = build_model()
+
+        assert type(model).__name__ == "ChatOpenAI"
+        assert model.model_name == "gpt-4o-mini"
+
+    def test_openai_honors_model_env_var(self, monkeypatch):
+        monkeypatch.setenv("PROVIDER", "openai")
+        monkeypatch.setenv("MODEL", "openai-custom")
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+        assert build_model().model_name == "openai-custom"
+
+    def test_unrecognized_provider_fails_fast(self, monkeypatch):
+        monkeypatch.setenv("PROVIDER", "grok")
+
+        with pytest.raises(ValueError, match="grok"):
+            build_model()
+
     def test_provider_match_is_case_insensitive(self, monkeypatch):
         monkeypatch.setenv("PROVIDER", "GROQ")
         monkeypatch.setenv("GROQ_API_KEY", "test-key")

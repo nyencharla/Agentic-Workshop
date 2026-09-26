@@ -19,8 +19,8 @@ Epic 1 gave the workshop a triage-decision schema and a loader; the repo still h
   - **success:** `uv run python run_agent.py T-1042` prints a decision in the Epic 1 schema: category `billing`, priority `P2`, route `billing-team`, plus a rationale.
 
 - **CAP-2**
-  - **intent:** The agent's model provider switches between Gemini and Groq by environment variable alone, with no code change.
-  - **success:** By default the agent runs on `ChatGoogleGenerativeAI` with the model from `MODEL` (default `gemini-3.8-flash`) and the key from `GEMINI_API_KEY`. Setting `PROVIDER=groq` runs it on `ChatGroq` with the model from `MODEL` (default `openai/gpt-oss-120b`) and the key from `GROQ_API_KEY`. Both paths work through the same `run_agent.py` invocation.
+  - **intent:** The agent's model provider switches between Gemini, Groq and OpenAI by environment variable alone, with no code change.
+  - **success:** By default the agent runs on `ChatGoogleGenerativeAI` with the model from `MODEL` (default `gemini-3.8-flash`) and the key from `GEMINI_API_KEY`. `PROVIDER=groq` runs it on `ChatGroq` (`MODEL` default `openai/gpt-oss-120b`, key `GROQ_API_KEY`); `PROVIDER=openai` runs it on `ChatOpenAI` (`MODEL` default `gpt-4o-mini`, key `OPENAI_API_KEY`). Any other non-empty `PROVIDER` stops with an error. All three work through the same `run_agent.py` invocation.
 
 - **CAP-3**
   - **intent:** Before deciding, the agent looks up the ticket, then looks up that ticket's customer using the customer ID the ticket lookup returned.
