@@ -8,3 +8,6 @@
 ## Deferred from: code review of 1-triage-decision-schema.md (2026-09-26)
 
 - `SPEC.md` (Epic 1) still lists as Open Questions the category/route pairing, extra-field rejection and one-sentence enforcement, all of which story 1 settled in code and tests. Must be reconciled through `/bmad-spec`, not by hand.
+- source_spec: `_bmad-output/specs/spec-epic-3/stories/1-the-eval-run-and-the-four-code-scorers.md`
+  summary: Epic 3 CAP-8 — auto-approve every escalation during the eval and report the escalation count — was left out of Epic 3 story 1.
+  evidence: Epic 2 story 2 (`escalate_to_human` and its human-in-the-loop gate) isn't built, so the agent never escalates and there is no gate to approve. Once it lands, `eval/run_eval.py` will block on the first escalating ticket (e.g. T-1044) until CAP-8 is added.
