@@ -25,6 +25,7 @@ def test_accepts_a_valid_decision_as_dict_or_json():
         ({"route": "finance-team"}, "route"),
         ({"rationale": "   "}, "rationale"),
         ({"rationale": "First sentence. Second sentence."}, "rationale"),
+        ({"rationale": "Refund is due. Mr. Smith was charged twice."}, "rationale"),
         ({"extra": "field"}, "extra"),
     ],
 )
@@ -65,6 +66,9 @@ def test_rejects_near_miss_casing_and_whitespace(change, field):
     [
         "e.g. this is a refund request that qualifies.",
         "Escalate per rule 3, since it is Enterprise and P1.",
+        "Escalate per rule 3. it is Enterprise.",
+        "Escalate per Dr. Smith request.",
+        "Per U.S. Government rules this is a billing matter.",
     ],
 )
 def test_accepts_a_single_sentence_containing_a_period_and_lowercase_continuation(rationale):
